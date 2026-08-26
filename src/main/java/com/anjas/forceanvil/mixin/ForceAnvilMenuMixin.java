@@ -7,12 +7,15 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
 import net.minecraft.world.inventory.AnvilMenu;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(AnvilMenu.class)
 public abstract class ForceAnvilMenuMixin {
+    @Shadow private int repairItemCountCost;
+
     @Inject(method = "createResult", at = @At("TAIL"))
     private void forceanvil$mergeAllEnchantments(CallbackInfo ci) {
         AnvilMenu menu = (AnvilMenu) (Object) this;
@@ -34,6 +37,7 @@ public abstract class ForceAnvilMenuMixin {
 
         menu.getSlot(2).set(result);
         menu.setData(0, 1);
+        repairItemCountCost = 1;
         menu.broadcastChanges();
     }
 }
