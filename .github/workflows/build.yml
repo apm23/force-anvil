@@ -19,7 +19,29 @@ jobs:
       - name: Compile and package
         run: gradle build --stacktrace
 
-      - name: Server startup smoke test
+      - name: Select runtime jar
+        shell: bash
+        run: |
+          RUNTIME_JAR=$(find build/libs -maxdepth 1 -type f -name 'force-anvil-*.jar' ! -name '*-sources.jar' | head -n1)
+          test -n "$RUNTIME_JAR"
+          echo "RUNTIME_JAR=$RUNTIME_JAR" >> "$GITHUB_ENV"
+          echo "Selected runtime jar: $RUNTIME_JAR"
+
+      - name: Verify runtime jar contents
+        shell: bash
+        run: |
+          jar tf "$RUNTIME_JAR" | tee jar-contents.txt
+          grep -q '^fabric.mod.json$' jar-contents.txt
+          grep -q '^forceanvil.mixins.json$' jar-contents.txt
+          grep -q '^com/anjas/forceanvil/ForceAnvilMod.class$' jar-contents.txt
+          grep -q '^com/anjas/forceanvil/mixin/ForceAnvilMenuMixin.class$' jar-contents.txt
+          grep -q '^data/minecraft/tags/block/anvil.json$' jar-contents.txt
+          if grep -q '^com/anjas/forceanvil/mixin/ForceAnvilMenuMixin.java$' jar-contents.txt; then
+            echo 'ERROR: sources jar selected as runtime jar'
+            exit 1
+          fi
+
+      - name: Development server startup smoke test
         shell: bash
         run: |
           mkdir -p run
@@ -33,7 +55,7 @@ jobs:
               OK=1
               break
             fi
-            if grep -qE 'Mixin apply failed|MixinTransformerError|Exception in thread|Failed to start|Could not execute entrypoint|Caused by:' server-smoke.log; then
+            if grep -qE 'Mixin apply failed|MixinTransformerError|InvalidMixinException|ClassNotFoundException|Exception in thread|Failed to start|Could not execute entrypoint|Caused by:' server-smoke.log; then
               break
             fi
             if ! kill -0 "$PID" 2>/dev/null; then
@@ -45,26 +67,22 @@ jobs:
           wait "$PID" 2>/dev/null || true
           cat server-smoke.log
           if [ "$OK" -ne 1 ]; then
-            echo 'Server did not reach successful startup.'
+            echo 'Development server did not reach successful startup.'
             exit 1
           fi
 
-      - name: Verify jar contents
+      - name: Stage runtime jar only
         shell: bash
         run: |
-          JAR=$(ls build/libs/force-anvil-*.jar | grep -v sources | head -n1)
-          test -n "$JAR"
-          jar tf "$JAR" | tee jar-contents.txt
-          grep -q 'fabric.mod.json' jar-contents.txt
-          grep -q 'com/anjas/forceanvil/ForceAnvilMod.class' jar-contents.txt
-          grep -q 'assets/forceanvil/' jar-contents.txt
-          grep -q 'data/forceanvil/' jar-contents.txt
+          mkdir -p artifact
+          cp "$RUNTIME_JAR" artifact/
+          ls -l artifact
 
       - uses: actions/upload-artifact@v4
         if: success()
         with:
           name: force-anvil-runtime-verified
-          path: build/libs/force-anvil-*.jar
+          path: artifact/*.jar
 
       - uses: actions/upload-artifact@v4
         if: always()
