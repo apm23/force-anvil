@@ -1,5 +1,6 @@
 package com.anjas.forceanvil.mixin;
 
+import com.anjas.forceanvil.ForceAnvilMenu;
 import net.minecraft.core.Holder;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
@@ -18,6 +19,8 @@ public abstract class ForceAnvilMenuMixin {
 
     @Inject(method = "createResult", at = @At("TAIL"))
     private void forceanvil$mergeAllEnchantments(CallbackInfo ci) {
+        if (!((Object) this instanceof ForceAnvilMenu)) return;
+
         AnvilMenu menu = (AnvilMenu) (Object) this;
         ItemStack base = menu.getSlot(0).getItem();
         ItemStack addition = menu.getSlot(1).getItem();
