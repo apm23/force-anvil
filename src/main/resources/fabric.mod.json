@@ -3,10 +3,13 @@
   "id": "forceanvil",
   "version": "${version}",
   "name": "Force Anvil",
-  "description": "Unrestricted anvil merging with highest-level preservation and forced enchantment slot effects.",
+  "description": "A dedicated craftable anvil for unrestricted enchantment merging with highest-level preservation and forced enchantment slot effects.",
   "authors": ["Anjas + OpenAI"],
   "license": "All-Rights-Reserved",
   "environment": "*",
+  "entrypoints": {
+    "main": ["com.anjas.forceanvil.ForceAnvilMod"]
+  },
   "mixins": ["forceanvil.mixins.json"],
   "depends": {
     "fabricloader": ">=0.19.3",
