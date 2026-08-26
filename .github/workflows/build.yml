@@ -1,10 +1,10 @@
-name: build
+name: build-and-runtime-verify
 on:
   push:
   pull_request:
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,8 +15,61 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.5.0'
-      - run: gradle build --stacktrace
+
+      - name: Compile and package
+        run: gradle build --stacktrace
+
+      - name: Server startup smoke test
+        shell: bash
+        run: |
+          mkdir -p run
+          echo 'eula=true' > run/eula.txt
+          set +e
+          timeout 90s gradle runServer --args='nogui' > server-smoke.log 2>&1 &
+          PID=$!
+          OK=0
+          for i in $(seq 1 90); do
+            if grep -qE 'Done \([0-9.]+s\)!|Done \(' server-smoke.log; then
+              OK=1
+              break
+            fi
+            if grep -qE 'Mixin apply failed|MixinTransformerError|Exception in thread|Failed to start|Could not execute entrypoint|Caused by:' server-smoke.log; then
+              break
+            fi
+            if ! kill -0 "$PID" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          kill "$PID" 2>/dev/null || true
+          wait "$PID" 2>/dev/null || true
+          cat server-smoke.log
+          if [ "$OK" -ne 1 ]; then
+            echo 'Server did not reach successful startup.'
+            exit 1
+          fi
+
+      - name: Verify jar contents
+        shell: bash
+        run: |
+          JAR=$(ls build/libs/force-anvil-*.jar | grep -v sources | head -n1)
+          test -n "$JAR"
+          jar tf "$JAR" | tee jar-contents.txt
+          grep -q 'fabric.mod.json' jar-contents.txt
+          grep -q 'com/anjas/forceanvil/ForceAnvilMod.class' jar-contents.txt
+          grep -q 'assets/forceanvil/' jar-contents.txt
+          grep -q 'data/forceanvil/' jar-contents.txt
+
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
-          name: force-anvil
+          name: force-anvil-runtime-verified
           path: build/libs/force-anvil-*.jar
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: runtime-verification-logs
+          path: |
+            server-smoke.log
+            jar-contents.txt
