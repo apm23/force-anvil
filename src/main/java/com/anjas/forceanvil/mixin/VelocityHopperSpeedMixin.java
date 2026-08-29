@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class VelocityHopperSpeedMixin {
     @Shadow private int cooldownTime;
 
-    @Inject(method = "serverTick", at = @At("HEAD"))
+    @Inject(method = "pushItemsTick", at = @At("HEAD"))
     private static void forceanvil$velocityHopperOneTick(Level level, BlockPos pos, BlockState state, HopperBlockEntity hopper, CallbackInfo ci) {
         if (state.is(ForceAnvilMod.VELOCITY_HOPPER) && ((VelocityHopperSpeedMixin)(Object)hopper).cooldownTime > 1) {
             ((VelocityHopperSpeedMixin)(Object)hopper).cooldownTime = 1;
