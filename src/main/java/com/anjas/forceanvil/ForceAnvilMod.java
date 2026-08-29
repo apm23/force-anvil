@@ -13,7 +13,6 @@ import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 
 public final class ForceAnvilMod implements ModInitializer {
@@ -50,8 +49,8 @@ public final class ForceAnvilMod implements ModInitializer {
         Registry.register(BuiltInRegistries.BLOCK, VELOCITY_HOPPER_BLOCK_KEY, VELOCITY_HOPPER);
         Registry.register(BuiltInRegistries.ITEM, VELOCITY_HOPPER_ITEM_KEY, VELOCITY_HOPPER_ITEM);
 
-        // Reuse vanilla hopper block entity safely so GUI, sided inventory, redstone and curved nozzle direction remain vanilla-stable.
-        ((BlockEntityTypeAccessor)(Object) BlockEntityType.HOPPER).forceanvil$getValidBlocks().add(VELOCITY_HOPPER);
+        var hopperType = BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(Identifier.withDefaultNamespace("hopper"));
+        ((BlockEntityTypeAccessor)(Object) hopperType).forceanvil$getValidBlocks().add(VELOCITY_HOPPER);
 
         CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.FUNCTIONAL_BLOCKS).register(output -> {
             output.accept(FORCE_ANVIL_ITEM);
