@@ -16,6 +16,41 @@ jobs:
         with:
           gradle-version: '9.5.0'
 
+      - name: Validate model and resource JSON
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          paths = [
+              'src/main/resources/assets/forceanvil/models/block/force_anvil.json',
+              'src/main/resources/assets/forceanvil/models/block/velocity_hopper_side.json',
+              'src/main/resources/assets/forceanvil/models/block/velocity_hopper_down.json',
+              'src/main/resources/assets/forceanvil/blockstates/velocity_hopper.json',
+              'src/main/resources/assets/forceanvil/blockstates/force_anvil.json',
+              'src/main/resources/assets/forceanvil/items/force_anvil.json',
+              'src/main/resources/assets/forceanvil/items/velocity_hopper.json',
+              'src/main/resources/data/forceanvil/recipe/force_anvil.json',
+              'src/main/resources/data/forceanvil/recipe/velocity_hopper.json'
+          ]
+          docs = {}
+          for p in paths:
+              docs[p] = json.loads(pathlib.Path(p).read_text())
+          anvil = docs[paths[0]]
+          side = docs[paths[1]]
+          down = docs[paths[2]]
+          assert len(anvil.get('elements', [])) >= 20, 'Force Anvil model lost 3D detail'
+          assert len(side.get('elements', [])) >= 18, 'Velocity Hopper side model lost 3D detail'
+          assert len(down.get('elements', [])) >= 18, 'Velocity Hopper down model lost 3D detail'
+          variants = docs[paths[3]].get('variants', {})
+          for facing in ('down','north','east','south','west'):
+              assert any(('facing='+facing) in key for key in variants), f'missing hopper facing {facing}'
+          recipe = docs[paths[-1]]
+          assert recipe['pattern'] == [' C ',' H ',' C '], 'Velocity Hopper recipe must be hopper + 2 copper'
+          assert recipe['key']['H'] == 'minecraft:hopper'
+          assert recipe['key']['C'] == 'minecraft:copper_ingot'
+          print('Visual/resource JSON validation OK')
+          PY
+
       - name: Compile and package
         run: gradle build --stacktrace
 
@@ -34,10 +69,18 @@ jobs:
           grep -q '^fabric.mod.json$' jar-contents.txt
           grep -q '^forceanvil.mixins.json$' jar-contents.txt
           grep -q '^com/anjas/forceanvil/ForceAnvilMod.class$' jar-contents.txt
+          grep -q '^com/anjas/forceanvil/VelocityHopperBlock.class$' jar-contents.txt
           grep -q '^com/anjas/forceanvil/mixin/ForceAnvilMenuMixin.class$' jar-contents.txt
+          grep -q '^com/anjas/forceanvil/mixin/VelocityHopperSpeedMixin.class$' jar-contents.txt
+          grep -q '^com/anjas/forceanvil/mixin/BlockEntityTypeAccessor.class$' jar-contents.txt
+          grep -q '^assets/forceanvil/models/block/force_anvil.json$' jar-contents.txt
+          grep -q '^assets/forceanvil/models/block/velocity_hopper_side.json$' jar-contents.txt
+          grep -q '^assets/forceanvil/models/block/velocity_hopper_down.json$' jar-contents.txt
+          grep -q '^assets/forceanvil/blockstates/velocity_hopper.json$' jar-contents.txt
+          grep -q '^data/forceanvil/recipe/velocity_hopper.json$' jar-contents.txt
           grep -q '^data/minecraft/tags/block/anvil.json$' jar-contents.txt
-          if grep -q '^com/anjas/forceanvil/mixin/ForceAnvilMenuMixin.java$' jar-contents.txt; then
-            echo 'ERROR: sources jar selected as runtime jar'
+          if grep -q '\.java$' jar-contents.txt; then
+            echo 'ERROR: source files found in runtime jar'
             exit 1
           fi
 
