@@ -2,6 +2,7 @@ package com.anjas.forceanvil.mixin;
 
 import com.anjas.forceanvil.ForceAnvilMenu;
 import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
@@ -17,8 +18,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ForceAnvilMenuMixin {
     @Shadow private int repairItemCountCost;
 
-    @Inject(method = "createResult", at = @At("TAIL"))
-    private void forceanvil$mergeAllEnchantments(CallbackInfo ci) {
+    @Inject(method = "createResult", at = @At("HEAD"), cancellable = true)
+    private void forceanvil$createForcedEnchantResult(CallbackInfo ci) {
         if (!((Object) this instanceof ForceAnvilMenu)) return;
 
         AnvilMenu menu = (AnvilMenu) (Object) this;
@@ -26,15 +27,27 @@ public abstract class ForceAnvilMenuMixin {
         ItemStack addition = menu.getSlot(1).getItem();
         if (base.isEmpty() || addition.isEmpty()) return;
 
-        ItemEnchantments incoming = EnchantmentHelper.getEnchantmentsForCrafting(addition);
+        // Read stored enchantments directly first (enchanted books, including over-level/custom books),
+        // then fall back to normal enchantments for modded items that carry enchantments directly.
+        ItemEnchantments incoming = addition.getOrDefault(DataComponents.STORED_ENCHANTMENTS, ItemEnchantments.EMPTY);
+        if (incoming.isEmpty()) {
+            incoming = addition.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
+        }
+        if (incoming.isEmpty()) {
+            incoming = EnchantmentHelper.getEnchantmentsForCrafting(addition);
+        }
         if (incoming.isEmpty()) return;
 
-        ItemStack vanillaResult = menu.getSlot(2).getItem();
-        ItemStack result = vanillaResult.isEmpty() ? base.copy() : vanillaResult.copy();
-
+        // Force Anvil owns this result. Do not let vanilla compatibility/max-level checks veto it.
+        ItemStack result = base.copy();
+        ItemEnchantments finalIncoming = incoming;
         EnchantmentHelper.updateEnchantments(result, mutable -> {
-            for (Holder<Enchantment> enchantment : incoming.keySet()) {
-                mutable.upgrade(enchantment, incoming.getLevel(enchantment));
+            for (Holder<Enchantment> enchantment : finalIncoming.keySet()) {
+                int incomingLevel = finalIncoming.getLevel(enchantment);
+                int currentLevel = mutable.getLevel(enchantment);
+                if (incomingLevel > currentLevel) {
+                    mutable.set(enchantment, incomingLevel);
+                }
             }
         });
 
@@ -42,5 +55,6 @@ public abstract class ForceAnvilMenuMixin {
         menu.setData(0, 1);
         repairItemCountCost = 1;
         menu.broadcastChanges();
+        ci.cancel();
     }
 }
